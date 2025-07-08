@@ -9,6 +9,7 @@ import apps.database.requests as rq
 from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from apps.database.requests import create_support_ticket, get_user_by_tg_id
+from aiogram.filters import StateFilter
 
 
 
@@ -26,20 +27,42 @@ async def category(callback: CallbackQuery):
     await callback.answer('Вы выбрали категорию')
     category_id = callback.data.split('_')[1]
     await callback.message.answer('Выберите товар', reply_markup=await items(category_id))
-@router.callback_query(F.data.startswith('item'))
-async def category(callback:CallbackQuery):
-    item_data = await rq.get_item(callback.data.split('_')[1])
-    await callback.answer('Вы выбрали товар')
-    await callback.message.answer(f'Название:{item_data.name}Награда:{item_data.reward}',
-                                  reply_markup=await items(callback.data))
+@router.callback_query(F.data.startswith('item_'))
+async def show_item(callback: CallbackQuery):
+    item_id = callback.data.split('_')[1]
+    item_data = await rq.get_item(item_id)
+    
+    # Создаем клавиатуру для возврата
+    keyboard = InlineKeyboardBuilder()
+    keyboard.add(InlineKeyboardButton(
+        text='Назад к товарам', 
+        callback_data=f'category_{item_data.category}'
+    ))
+    keyboard.add(InlineKeyboardButton(
+        text='Категории', 
+        callback_data='back_to_categories'
+    ))
+    keyboard.add(InlineKeyboardButton(
+        text='Главное меню', 
+        callback_data='to_main'
+    ))
+    
+    await callback.message.answer(
+        f'Название: {item_data.name}\n'
+        f'Награда: {item_data.reward}\n'
+        f'Описание: {item_data.desc}',
+        reply_markup=keyboard.adjust(2).as_markup()
+    )
+    await callback.answer()
 @router.callback_query(F.data == 'to_main')
 async def back_to_main(callback: CallbackQuery):
     await callback.message.delete()  
     await callback.message.answer(
-        "Вы вернулись в главное меню",
+        "Вы вернулись в главное меню.Вы можете выбрать категорию товара,либо обратиться в тех поддержку за помощью.",
         reply_markup=main_kb
     )
     await callback.answer()
+
 @router.callback_query(F.data == 'back_to_categories')
 async def back_to_categories(callback: CallbackQuery):
     await callback.message.delete()  
@@ -59,7 +82,7 @@ async def TP_room(callback: CallbackQuery, state: FSMContext):
     )
     await state.set_state(SupportState.waiting_for_support_message)
     await callback.answer()
-@router.message(Command("cancel"))
+@router.message(Command("cancel"),~StateFilter(None))
 async def cancel_support(message: Message, state: FSMContext):
     current_state = await state.get_state()
     if current_state == SupportState.waiting_for_support_message:

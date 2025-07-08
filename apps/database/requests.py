@@ -1,6 +1,8 @@
 from apps.database.models import async_session
 from apps.database.models import User,Category,Item
 from sqlalchemy import select,update,delete,desc
+from datetime import datetime
+from apps.database.models import SupportTicket
 
 async def set_user(tg_id):
     async with async_session() as session:
@@ -20,9 +22,6 @@ async def get_category_item(category_id):
 async def get_item(item_id):
     async with async_session() as session:
         return await session.scalar(select(Item).where(Item.id == item_id))
-# Добавьте в requests.py
-from datetime import datetime
-from apps.database.models import SupportTicket
 
 async def create_support_ticket(user_id: int, message: str):
     async with async_session() as session:
